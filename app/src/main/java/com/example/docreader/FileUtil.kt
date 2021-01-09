@@ -1,21 +1,18 @@
 package com.example.docreader
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.util.Log
 import java.io.*
 
 class FileUtil {
-    private val EOF = -1
-    private val DEFAULT_BUFFER_SIZE = 1024 * 4
-
-    private fun FileUtil() {}
+    private val _eof = -1
 
     @Throws(IOException::class)
-    public fun convertFile(context: Context, uri: Uri): File? {
-        val inputStream: InputStream = context.getContentResolver().openInputStream(uri)!!
+    fun convertFile(context: Context, uri: Uri): File {
+        val inputStream: InputStream = context.contentResolver.openInputStream(uri)!!
         val fileName = getFileName(context, uri)
         val splitName = splitFileName(fileName)
         var tempFile: File = File.createTempFile(splitName[0], splitName[1])
@@ -27,13 +24,9 @@ class FileUtil {
         } catch (e: FileNotFoundException) {
             e.printStackTrace()
         }
-        if (inputStream != null) {
-            out?.let { copy(inputStream, it) }
-            inputStream.close()
-        }
-        if (out != null) {
-            out.close()
-        }
+        out?.let { copy(inputStream, it) }
+        inputStream.close()
+        out?.close()
         return tempFile
     }
 
@@ -48,24 +41,23 @@ class FileUtil {
         return arrayOf(name, extension)
     }
 
+    @SuppressLint("Recycle")
     private fun getFileName(context: Context, uri: Uri): String {
         var result: String? = null
-        if (uri.getScheme().equals("content")) {
-            val cursor: Cursor = context.getContentResolver().query(uri, null, null, null, null)!!
+        if (uri.scheme.equals("content")) {
+            val cursor: Cursor = context.contentResolver.query(uri, null, null, null, null)!!
             try {
-                if (cursor != null && cursor.moveToFirst()) {
+                if (cursor.moveToFirst()) {
                     result = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME))
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
-                if (cursor != null) {
-                    cursor.close()
-                }
+                cursor.close()
             }
         }
         if (result == null) {
-            result = uri.getPath()
+            result = uri.path
             val cut: Int = result!!.lastIndexOf(File.separator)
             if (cut != -1) {
                 result = result.substring(cut + 1)
@@ -75,13 +67,11 @@ class FileUtil {
     }
 
     private fun rename(file: File, newName: String): File {
-        val newFile = File(file.getParent(), newName)
-        if (!newFile.equals(file)) {
+        val newFile = File(file.parent, newName)
+        if (newFile != file) {
             if (newFile.exists() && newFile.delete()) {
-                Log.e("FileUtil", "Delete old $newName file")
             }
             if (file.renameTo(newFile)) {
-                Log.e("FileUtil", "Rename file to $newName")
             }
         }
         return newFile
@@ -90,13 +80,12 @@ class FileUtil {
     @Throws(IOException::class)
     private fun copy(input: InputStream, output: OutputStream): Long {
         var count: Long = 0
-        var n: Int = 0
+        var n: Int
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-        while (EOF != input.read(buffer).also({ n = it })) {
+        while (_eof != input.read(buffer).also { n = it }) {
             output.write(buffer, 0, n)
             count += n.toLong()
         }
         return count
     }
-
 }

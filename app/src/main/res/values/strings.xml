@@ -1,3 +1,18 @@
 <resources>
     <string name="app_name">DocReader</string>
+
+    <array name="img_to_convert">
+        <item>PDF</item>
+        <item>DOC</item>
+    </array>
+
+    <array name="pdf_to_convert">
+        <item>IMG</item>
+        <item>DOC</item>
+    </array>
+
+    <array name="doc_to_convert">
+        <item>IMG</item>
+        <item>PDF</item>
+    </array>
 </resources>

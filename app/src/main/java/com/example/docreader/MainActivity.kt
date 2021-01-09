@@ -9,33 +9,32 @@ import android.graphics.pdf.PdfDocument.PageInfo
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.os.ParcelFileDescriptor
 import android.util.Log
-import android.widget.Button
-import android.widget.ImageView
-import android.widget.Toast
+import android.view.View
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import java.io.*
 
-import com.aspose.words.Document;
-import com.aspose.words.License;
+import com.aspose.words.Document
 
-class MainActivity : AppCompatActivity() {
-    private val RECORD_REQUEST_CODE = 101
+class MainActivity : AppCompatActivity() ,  AdapterView.OnItemSelectedListener {
+    private val _requestCode = 101
     private var bitmap: Bitmap? = null
     private var url:Uri? = null
     private var pdfFile:File? = null
-    private var createFilePath :File ?= null
+    private val constant : Constant = Constant().getInstance()!!
+    private var convertFileType :String = "ABC"
+    private var spinner: Spinner? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         val button = findViewById<Button>(R.id.select)
-        button?.setOnClickListener() {
+        button?.setOnClickListener {
             setupPermissions()
             val intent = Intent(Intent.ACTION_GET_CONTENT)
             intent.addCategory(Intent.CATEGORY_OPENABLE)
@@ -44,54 +43,53 @@ class MainActivity : AppCompatActivity() {
             startActivityForResult(i, 111)
         }
 
+        spinner = findViewById(R.id.selection)
+        spinner!!.onItemSelectedListener = this
+
 
         val convert = findViewById<Button>(R.id.convert)
-        convert?.setOnClickListener() {
-            val mimeTypeStr :String = checkMimeType()
-            if ("image".equals(mimeTypeStr)) {
+        convert?.setOnClickListener {
+            val mimeTypeStr :String = constant.checkMimeType(this@MainActivity, this.url!!)
+            Log.e("ConvertClick", "$mimeTypeStr convertFileType : $convertFileType");
+            if ("image" == mimeTypeStr && convertFileType == "PDF" ) {
                 createImageToPdf()
             }
-            else if ("pdf".equals(mimeTypeStr)){
-                //createPdfToImage()
+            else if ("pdf" == mimeTypeStr && convertFileType == "DOC"){
                 createPdfToDoc()
             }
-            else {
+            else if ("pdf" == mimeTypeStr && convertFileType == "IMG"){
+                createPdfToImage()
+            }
+            else if ("msword" == mimeTypeStr && convertFileType == "PDF"){
                 createDocToPdf()
             }
         }
     }
 
+    private fun setSpinnerAdapter(toConvert: Int) {
+        Log.e("setSpinnerAdapter" , toConvert.toString())
+        // Create an ArrayAdapter using the string array and a default spinner layout
+        ArrayAdapter.createFromResource(this,  toConvert , android.R.layout.simple_spinner_item)
+                .also { adapter ->
+                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                    spinner!!.adapter = adapter
+                }
+    }
+
+
     private fun createPdfToDoc() {
-        Log.e("ASD" , "createPdfToDoc  " + createFilePath.toString() + " " + pdfFile.toString() )
+        Log.e("createPdfToDoc" , "createPdfToDoc  " + pdfFile.toString() )
         val doc = Document(pdfFile.toString())
-        // save DOCX as PDF
-        creteFile("DocTOPdfFile.doc")
+        val createFilePath : File = constant.creteFile("DocTOPdfFile.doc")
         doc.save(createFilePath.toString())
-        // show PDF file location in toast as well as treeview (optional)
-        Log.e("ASD" , " createPdfToDoc  " + createFilePath.toString() + " ")
-    }
-
-    private fun createDocToPdf() {
-        Log.e("ASD" , " DOCX as PDF  " + createFilePath.toString() + " " + pdfFile.toString() )
-        val doc = Document(pdfFile.toString())
-        // save DOCX as PDF
-        creteFile("DocTOPdfFile.pdf")
-        doc.save(createFilePath.toString())
-        // show PDF file location in toast as well as treeview (optional)
-        Log.e("ASD" , " DOCX as PDF  " + createFilePath.toString() + " ")
-    }
-
-    private fun checkMimeType(): String {
-        val type : String = contentResolver.getType(url!!).toString()
-        Log.e("MYMEtype", type + " dd " + type.substringBefore("/"))
-        return type.substringBefore("/")
+        Log.e("createPdfToDoc" , " createPdfToDoc  $createFilePath ")
     }
 
     private fun createPdfToImage() {
         val bitmaps: ArrayList<Bitmap> = ArrayList()
         try {
-            Log.e("pdfFile", pdfFile!!.absolutePath + "  absolutePath ");
-            Log.e("pdfFile", pdfFile.toString() + " ");
+            Log.e("createPdfToImage", pdfFile!!.absolutePath + "  absolutePath ")
+            Log.e("createPdfToImage", pdfFile.toString() + " ")
             val renderer = PdfRenderer(ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY))
             var bitmap: Bitmap
             val pageCount = renderer.pageCount
@@ -104,99 +102,125 @@ class MainActivity : AppCompatActivity() {
                 bitmaps.add(bitmap)
                 // close the page
                 page.close()
-                findViewById<ImageView>(R.id.image).setImageBitmap(bitmap);
+                findViewById<ImageView>(R.id.image).setImageBitmap(bitmap)
             }
 
             // close the renderer
             renderer.close()
         } catch (ex: java.lang.Exception) {
             ex.printStackTrace()
-            Log.e("pdfFile", ex.localizedMessage + " Exception ");
         }
-
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 111){
-            Log.e("TAG", data.toString())
+            Log.e("onActivityResult", data.toString())
             this.url = data!!.data
-            val mimeTypeStr :String = checkMimeType()
-            if ("image".equals(mimeTypeStr)) {
-                val inStream: InputStream? = contentResolver.openInputStream(data!!.getData()!!)
-                bitmap = BitmapFactory.decodeStream(inStream);
-            }
-            else {
-                try {
-                    val fiileUtil : FileUtil = FileUtil();
-                    pdfFile = fiileUtil.convertFile(this@MainActivity, data.data!!)!!
-                    Log.e("file", "File...:::: uti - " + pdfFile!!.path.toString() + " file -" + pdfFile.toString() + " : " + pdfFile!!.exists())
-                } catch (e: IOException) {
-                    e.printStackTrace()
+            when (constant.checkMimeType(this@MainActivity, this.url!!)) {
+                "image" -> {
+                    setSpinnerAdapter(R.array.img_to_convert)
+                    val inStream: InputStream? = contentResolver.openInputStream(data.data!!)
+                    bitmap = BitmapFactory.decodeStream(inStream)
+                }
+                "pdf" -> {
+                    setSpinnerAdapter(R.array.pdf_to_convert)
+                    try {
+                        val fiileUtil = FileUtil()
+                        pdfFile = fiileUtil.convertFile(this@MainActivity, data.data!!)
+                        Log.e("onActivityResult", "File...:::: uti - " + pdfFile!!.path.toString() + " file -" + pdfFile.toString() + " : " + pdfFile!!.exists())
+                    } catch (e: IOException) {
+                        e.printStackTrace()
+                    }
+                }
+                "msword" -> {
+                    setSpinnerAdapter(R.array.doc_to_convert)
+                    try {
+                        val fiileUtil = FileUtil()
+                        pdfFile = fiileUtil.convertFile(this@MainActivity, data.data!!)
+                        Log.e("onActivityResult", "File...:::: uti - " + pdfFile!!.path.toString() + " file -" + pdfFile.toString() + " : " + pdfFile!!.exists())
+                    } catch (e: IOException) {
+                        e.printStackTrace()
+                    }
                 }
             }
-
         }
     }
 
     private fun createImageToPdf() {
         val document = PdfDocument()
-        val pageInfo = PageInfo.Builder(bitmap!!.getWidth(), bitmap!!.getHeight(), 1).create()
+        val pageInfo = PageInfo.Builder(bitmap!!.width, bitmap!!.height, 1).create()
         val page = document.startPage(pageInfo)
         val canvas: Canvas = page.canvas
         val paint = Paint()
-        paint.setColor(Color.parseColor("#ffffff"))
+        paint.color = Color.parseColor("#ffffff")
         canvas.drawPaint(paint)
-        bitmap = bitmap?.let { Bitmap.createScaledBitmap(bitmap!!, bitmap!!.getWidth(), it.getHeight(), true) }
-        paint.setColor(Color.BLUE)
+        bitmap = bitmap?.let { Bitmap.createScaledBitmap(bitmap!!, bitmap!!.width, it.height, true) }
+        paint.color = Color.BLUE
         canvas.drawBitmap(bitmap!!, 0f, 0f, paint)
         document.finishPage(page)
 
-        creteFile("ImgToPdf.pdf")
+        val createFilePath : File = constant.creteFile("ImgToPdf.pdf")
         try {
             document.writeTo(FileOutputStream(createFilePath))
         } catch (e: IOException) {
             e.printStackTrace()
-            Toast.makeText(this, "Something wrong: " + e.toString(), Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Something wrong: $e", Toast.LENGTH_LONG).show()
         }
-
-        // close the document
         document.close()
     }
-
-    private fun creteFile (filename : String){
-        val dirPath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-        createFilePath = File(dirPath, filename)
-        try {
-            if (!dirPath.isDirectory) {
-                dirPath.mkdirs()
-            }
-            createFilePath!!.createNewFile()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
 
     private fun setupPermissions() {
         val permission = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
         if (permission != PackageManager.PERMISSION_GRANTED) {
-            Log.e("TAG", "Permission to record denied")
+            Log.e("setupPermissions", "Permission to record denied")
             ActivityCompat.requestPermissions(this,
                     arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                    RECORD_REQUEST_CODE)
+                    _requestCode)
         }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         when (requestCode) {
-            RECORD_REQUEST_CODE -> {
+            _requestCode -> {
                 if (grantResults.isEmpty() || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                    Log.e("TAG", "Permission has been denied by user")
+                    Log.e("PermissionsResult", "Permission has been denied by user")
                 } else {
-                    Log.e("TAG", "Permission has been granted by user")
+                    Log.e("PermissionsResult", "Permission has been granted by user")
                 }
             }
         }
+    }
+
+    private fun createDocToPdf() {
+        Log.e("createDocToPdf" , " DOCX as PDF  " + pdfFile.toString() )
+        val doc = Document(pdfFile.toString())
+        val createFilePath : File = constant.creteFile("DocTOPdfFile.pdf")
+        doc.save(createFilePath.toString())
+        Log.e("createDocToPdf" , " DOCX as PDF  $createFilePath ")
+    }
+
+    override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+        val themes : Array<String>
+        when (constant.checkMimeType(this@MainActivity, this.url!!)) {
+            "image" -> {
+                themes = resources.getStringArray(R.array.img_to_convert)
+                convertFileType = themes[position]
+                Log.e("onItemSelected" , themes[position] + " dd " )
+            }
+            "pdf" -> {
+                themes = resources.getStringArray(R.array.pdf_to_convert)
+                convertFileType = themes[position]
+                Log.e("onItemSelected" , themes[position] + " dd " )
+            }
+            "msword" -> {
+                themes = resources.getStringArray(R.array.doc_to_convert)
+                convertFileType = themes[position]
+                Log.e("onItemSelected" , themes[position] + " dd " )
+            }
+        }
+    }
+
+    override fun onNothingSelected(parent: AdapterView<*>?) {
     }
 }
